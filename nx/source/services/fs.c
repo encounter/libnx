@@ -1671,7 +1671,7 @@ Result fsDeviceOperatorGetGameCardHandle(FsDeviceOperator* d, FsGameCardHandle* 
     return rc;
 }
 
-Result fsDeviceOperatorGetGameCardAttribute(FsDeviceOperator* d, FsGameCardHandle* handle, u8 *out) {
+Result fsDeviceOperatorGetGameCardAttribute(FsDeviceOperator* d, const FsGameCardHandle* handle, u8 *out) {
     IpcCommand c;
     ipcInitialize(&c);
 
