@@ -254,5 +254,5 @@ void fsEventNotifierClose(FsEventNotifier* e);
 Result fsDeviceOperatorIsSdCardInserted(FsDeviceOperator* d, bool* out);
 Result fsDeviceOperatorIsGameCardInserted(FsDeviceOperator* d, bool* out);
 Result fsDeviceOperatorGetGameCardHandle(FsDeviceOperator* d, FsGameCardHandle* out);
-Result fsDeviceOperatorGetGameCardAttribute(FsDeviceOperator* d, FsGameCardHandle handle, u8 *out);
+Result fsDeviceOperatorGetGameCardAttribute(FsDeviceOperator* d, FsGameCardHandle* handle, u8 *out);
 void fsDeviceOperatorClose(FsDeviceOperator* d);

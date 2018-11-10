@@ -1671,7 +1671,7 @@ Result fsDeviceOperatorGetGameCardHandle(FsDeviceOperator* d, FsGameCardHandle* 
     return rc;
 }
 
-Result fsDeviceOperatorGetGameCardAttribute(FsDeviceOperator* d, FsGameCardHandle handle, u8 *out) {
+Result fsDeviceOperatorGetGameCardAttribute(FsDeviceOperator* d, FsGameCardHandle* handle, u8 *out) {
     IpcCommand c;
     ipcInitialize(&c);
 
@@ -1685,7 +1685,7 @@ Result fsDeviceOperatorGetGameCardAttribute(FsDeviceOperator* d, FsGameCardHandl
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = 205;
-    raw->handle = handle.value;
+    raw->handle = handle->value;
 
     Result rc = serviceIpcDispatch(&d->s);
 
