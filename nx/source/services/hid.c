@@ -60,17 +60,12 @@ Result hidInitialize(void)
     if (serviceIsActive(&g_hidSrv))
         return 0;
 
-    if (R_FAILED(appletInitialize()))
-        return MAKERESULT(Module_Libnx, LibnxError_AppletFailedToInitialize);
-
     Result rc;
     Handle sharedmem_handle;
-    u64 AppletResourceUserId;
 
-    rc = appletGetAppletResourceUserId(&AppletResourceUserId);
     // If this failed (for example because we're a sysmodule) AppletResourceUserId stays zero
-    if (R_FAILED(rc))
-        AppletResourceUserId = 0;
+    u64 AppletResourceUserId = 0;
+    appletGetAppletResourceUserId(&AppletResourceUserId);
 
     rc = smGetService(&g_hidSrv, "hid");
     if (R_FAILED(rc))
@@ -118,8 +113,6 @@ void hidExit(void)
         serviceClose(&g_hidIAppletResource);
         serviceClose(&g_hidSrv);
         shmemClose(&g_hidSharedmem);
-
-        appletExit();
     }
 }
 
