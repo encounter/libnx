@@ -75,6 +75,7 @@ extern "C" {
 #include "switch/display/binder.h"
 #include "switch/display/parcel.h"
 #include "switch/display/buffer_producer.h"
+#include "switch/display/native_window.h"
 
 #include "switch/nvidia/ioctl.h"
 #include "switch/nvidia/map.h"
