@@ -68,7 +68,7 @@ typedef struct {
         FatalAarch64Context aarch64_ctx;
         FatalAarch32Context aarch32_ctx;
     };
-    
+
     bool is_aarch32;
     u32 type;
 } FatalContext;

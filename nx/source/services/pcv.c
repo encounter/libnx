@@ -11,7 +11,7 @@ static u64 g_refCnt;
 
 Result pcvInitialize(void) {
     Result rc = 0;
-    
+
     atomicIncrement64(&g_refCnt);
 
     if (serviceIsActive(&g_pcvSrv))
@@ -96,7 +96,7 @@ Result pcvGetClockRate(PcvModule module, u32 *out_hz) {
         resp = r.Raw;
 
         rc = resp->result;
-        
+
         if (R_SUCCEEDED(rc)) {
             *out_hz = resp->hz;
         }

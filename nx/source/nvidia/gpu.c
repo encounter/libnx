@@ -5,8 +5,7 @@
 #include "kernel/svc.h"
 #include "services/nv.h"
 #include "nvidia/ioctl.h"
-#include "nvidia/buffer.h"
-#include "nvidia/info.h"
+#include "nvidia/gpu.h"
 
 static u32 g_ctrlgpu_fd = -1;
 static u64 g_refCnt;
@@ -14,7 +13,7 @@ static u64 g_refCnt;
 static nvioctl_gpu_characteristics g_gpu_characteristics;
 static u32 g_zcull_ctx_size;
 
-Result nvInfoInit()
+Result nvGpuInit(void)
 {
     Result rc;
 
@@ -33,15 +32,14 @@ Result nvInfoInit()
         rc = nvioctlNvhostCtrlGpu_ZCullGetCtxSize(g_ctrlgpu_fd, &g_zcull_ctx_size);
 
     if (R_FAILED(rc))
-        nvInfoExit();
+        nvGpuExit();
 
     return rc;
 }
 
-void nvInfoExit()
+void nvGpuExit(void)
 {
-    if (atomicDecrement64(&g_refCnt) == 0)
-    {
+    if (atomicDecrement64(&g_refCnt) == 0) {
         if (g_ctrlgpu_fd != -1)
             nvClose(g_ctrlgpu_fd);
 
@@ -49,6 +47,12 @@ void nvInfoExit()
     }
 }
 
-u32 nvInfoGetZcullCtxSize() {
+const nvioctl_gpu_characteristics* nvGpuGetCharacteristics(void)
+{
+    return &g_gpu_characteristics;
+}
+
+u32 nvGpuGetZcullCtxSize(void)
+{
     return g_zcull_ctx_size;
 }
