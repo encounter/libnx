@@ -5,6 +5,7 @@
 #include "kernel/ipc.h"
 #include "kernel/detect.h"
 #include "services/usb.h"
+#include "services/usbds.h"
 #include "services/sm.h"
 #include "runtime/util/utf.h"
 
@@ -33,6 +34,10 @@ Result usbDsInitialize(void)
     Result rc = 0;
 
     rc = smGetService(&g_usbDsSrv, "usb:ds");
+
+    if (R_SUCCEEDED(rc)) {
+        rc = serviceConvertToDomain(&g_usbDsSrv);
+    }
 
     if (R_SUCCEEDED(rc))
         rc = _usbDsBindDevice(UsbComplexId_Default);
@@ -161,7 +166,7 @@ static Result _usbDsBindDevice(UsbComplexId complexId) {
         u32 complexId;
     } *raw;
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(&g_usbDsSrv, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = 0;
@@ -171,12 +176,13 @@ static Result _usbDsBindDevice(UsbComplexId complexId) {
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
-        } *resp = r.Raw;
+        } *resp;
+
+        serviceIpcParse(&g_usbDsSrv, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
     }
@@ -195,7 +201,7 @@ static Result _usbDsBindClientProcess(Handle prochandle) {
 
     ipcSendHandleCopy(&c, prochandle);
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(&g_usbDsSrv, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = 1;
@@ -204,12 +210,13 @@ static Result _usbDsBindClientProcess(Handle prochandle) {
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
-        } *resp = r.Raw;
+        } *resp;
+
+        serviceIpcParse(&g_usbDsSrv, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
     }
@@ -226,7 +233,7 @@ static Result _usbDsGetEvent(Service* srv, Event* event_out, u64 cmd_id) {
         u64 cmd_id;
     } *raw;
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(srv, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = cmd_id;
@@ -235,12 +242,13 @@ static Result _usbDsGetEvent(Service* srv, Event* event_out, u64 cmd_id) {
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
-        } *resp = r.Raw;
+        } *resp;
+
+        serviceIpcParse(srv, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
 
@@ -261,7 +269,7 @@ Result usbDsGetState(u32 *out) {
         u64 cmd_id;
     } *raw;
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(&g_usbDsSrv, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = 4;
@@ -270,13 +278,14 @@ Result usbDsGetState(u32 *out) {
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
             u32 out;
-        } *resp = r.Raw;
+        } *resp;
+
+        serviceIpcParse(&g_usbDsSrv, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
         if (R_SUCCEEDED(rc) && out)*out = resp->out;
@@ -353,7 +362,7 @@ Result usbDsSetVidPidBcd(const UsbDsDeviceInfo* deviceinfo) {
 
     ipcAddSendBuffer(&c, deviceinfo, sizeof(UsbDsDeviceInfo), 0);
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(&g_usbDsSrv, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = 5;
@@ -362,12 +371,13 @@ Result usbDsSetVidPidBcd(const UsbDsDeviceInfo* deviceinfo) {
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
-        } *resp = r.Raw;
+        } *resp;
+
+        serviceIpcParse(&g_usbDsSrv, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
     }
@@ -375,7 +385,7 @@ Result usbDsSetVidPidBcd(const UsbDsDeviceInfo* deviceinfo) {
     return rc;
 }
 
-static Result _usbDsGetSession(Service* srv, Service* srv_out, u64 cmd_id, const void* buf0, size_t buf0size, const void* buf1, size_t buf1size) {
+static Result _usbDsGetSession(Service* srv, Service* srv_out, u64 cmd_id, const void* buf0, size_t buf0size, const void* buf1, size_t buf1size, u8 *out) {
     IpcCommand c;
     ipcInitialize(&c);
 
@@ -389,7 +399,7 @@ static Result _usbDsGetSession(Service* srv, Service* srv_out, u64 cmd_id, const
     if (buf1 && buf1size)
         ipcAddSendBuffer(&c, buf1, buf1size, 0);
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(srv, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = cmd_id;
@@ -398,17 +408,21 @@ static Result _usbDsGetSession(Service* srv, Service* srv_out, u64 cmd_id, const
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
-        } *resp = r.Raw;
+            u8  out;
+        } PACKED *resp;
+
+        serviceIpcParse(srv, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
 
+        if (R_SUCCEEDED(rc) && out) *out = resp->out;
+
         if (R_SUCCEEDED(rc)) {
-            serviceCreate(srv_out, r.Handles[0]);
+            serviceCreateSubservice(srv_out, srv, &r, 0);
         }
     }
 
@@ -424,7 +438,7 @@ static Result _usbDsCmdNoParams(Service* srv, u64 cmd_id) {
         u64 cmd_id;
     } *raw;
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(srv, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = cmd_id;
@@ -433,12 +447,13 @@ static Result _usbDsCmdNoParams(Service* srv, u64 cmd_id) {
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
-        } *resp = r.Raw;
+        } *resp;
+
+        serviceIpcParse(srv, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
     }
@@ -460,7 +475,7 @@ static Result _usbDsPostBuffer(Service* srv, u64 cmd_id, void* buffer, size_t si
         u64 buffer;
     } *raw;
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(srv, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = cmd_id;
@@ -472,13 +487,14 @@ static Result _usbDsPostBuffer(Service* srv, u64 cmd_id, void* buffer, size_t si
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
             u32 urbId;
-        } *resp = r.Raw;
+        } *resp;
+
+        serviceIpcParse(srv, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
         if (R_SUCCEEDED(rc) && urbId)*urbId = resp->urbId;
@@ -496,7 +512,7 @@ static Result _usbDsGetReport(Service* srv, u64 cmd_id, UsbDsReportData *out) {
         u64 cmd_id;
     } *raw;
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(srv, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = cmd_id;
@@ -505,13 +521,14 @@ static Result _usbDsGetReport(Service* srv, u64 cmd_id, UsbDsReportData *out) {
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
             UsbDsReportData out;
-        } *resp = r.Raw;
+        } *resp;
+
+        serviceIpcParse(srv, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
 
@@ -529,7 +546,7 @@ Result usbDsGetDsInterface(UsbDsInterface** interface, struct usb_interface_desc
     Result rc;
     for (unsigned int i = 0; i < TOTAL_INTERFACES; i++) {
         send_desc.bInterfaceNumber = i;
-        rc = _usbDsGetSession(&g_usbDsSrv, &srv, 2, &send_desc, USB_DT_INTERFACE_SIZE, interface_name, strlen(interface_name)+1);
+        rc = _usbDsGetSession(&g_usbDsSrv, &srv, 2, &send_desc, USB_DT_INTERFACE_SIZE, interface_name, strlen(interface_name)+1, NULL);
         if (R_SUCCEEDED(rc)) {
             break;
         }
@@ -581,7 +598,7 @@ Result usbDsRegisterInterface(UsbDsInterface** interface)
             u32 intf_num;
         } *raw;
 
-        raw = ipcPrepareHeader(&c, sizeof(*raw));
+        raw = serviceIpcPrepareHeader(&g_usbDsSrv, &c, sizeof(*raw));
 
         raw->magic = SFCI_MAGIC;
         raw->cmd_id = 2;
@@ -591,17 +608,18 @@ Result usbDsRegisterInterface(UsbDsInterface** interface)
 
         if (R_SUCCEEDED(rc)) {
             IpcParsedCommand r;
-            ipcParse(&r);
-
             struct {
                 u64 magic;
                 u64 result;
-            } *resp = r.Raw;
+            } *resp;
+
+            serviceIpcParse(&g_usbDsSrv, &r, sizeof(*resp));
+            resp = r.Raw;
 
             rc = resp->result;
 
             if (R_SUCCEEDED(rc)) {
-                serviceCreate(&srv, r.Handles[0]);
+                serviceCreateSubservice(&srv, &g_usbDsSrv, &r, 0);
                 break;
             }
         }
@@ -653,7 +671,7 @@ Result usbDsRegisterInterfaceEx(UsbDsInterface** interface, u32 intf_num)
         u32 intf_num;
     } *raw;
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(&g_usbDsSrv, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = 2;
@@ -663,17 +681,18 @@ Result usbDsRegisterInterfaceEx(UsbDsInterface** interface, u32 intf_num)
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
-        } *resp = r.Raw;
+        } *resp;
+
+        serviceIpcParse(&g_usbDsSrv, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
 
         if (R_SUCCEEDED(rc)) {
-            serviceCreate(&ptr->h, r.Handles[0]);
+            serviceCreateSubservice(&ptr->h, &g_usbDsSrv, &r, 0);
         }
     }
 
@@ -711,7 +730,7 @@ static Result _usbDsAddUsbStringDescriptorRaw(u8 *out_index, struct usb_string_d
         u64 cmd_id;
     } *raw;
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(&g_usbDsSrv, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = 6;
@@ -720,13 +739,14 @@ static Result _usbDsAddUsbStringDescriptorRaw(u8 *out_index, struct usb_string_d
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
             u8 index;
-        } *resp = r.Raw;
+        } *resp;
+
+        serviceIpcParse(&g_usbDsSrv, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
         if (R_SUCCEEDED(rc) && out_index) {
@@ -779,7 +799,7 @@ Result usbDsDeleteUsbStringDescriptor(u8 index) {
         u32 index;
     } *raw;
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(&g_usbDsSrv, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = 7;
@@ -789,12 +809,13 @@ Result usbDsDeleteUsbStringDescriptor(u8 index) {
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
-        } *resp = r.Raw;
+        } *resp;
+
+        serviceIpcParse(&g_usbDsSrv, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
     }
@@ -815,7 +836,7 @@ Result usbDsSetUsbDeviceDescriptor(UsbDeviceSpeed speed, struct usb_device_descr
         u32 speed;
     } *raw;
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(&g_usbDsSrv, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = 8;
@@ -825,12 +846,13 @@ Result usbDsSetUsbDeviceDescriptor(UsbDeviceSpeed speed, struct usb_device_descr
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
-        } *resp = r.Raw;
+        } *resp;
+
+        serviceIpcParse(&g_usbDsSrv, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
     }
@@ -849,7 +871,7 @@ Result usbDsSetBinaryObjectStore(void* bos, size_t bos_size) {
         u64 cmd_id;
     } *raw;
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(&g_usbDsSrv, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = 9;
@@ -858,12 +880,13 @@ Result usbDsSetBinaryObjectStore(void* bos, size_t bos_size) {
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
-        } *resp = r.Raw;
+        } *resp;
+
+        serviceIpcParse(&g_usbDsSrv, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
     }
@@ -900,7 +923,7 @@ Result usbDsInterface_GetSetupPacket(UsbDsInterface* interface, void* buffer, si
         u64 cmd_id;
     } *raw;
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(&interface->h, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = 2;
@@ -909,12 +932,13 @@ Result usbDsInterface_GetSetupPacket(UsbDsInterface* interface, void* buffer, si
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
-        } *resp = r.Raw;
+        } *resp;
+
+        serviceIpcParse(&interface->h, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
     }
@@ -929,7 +953,7 @@ Result usbDsInterface_GetDsEndpoint(UsbDsInterface* interface, UsbDsEndpoint** e
     UsbDsEndpoint* ptr = _usbDsAllocateEndpoint(interface);
     if(ptr==NULL)return MAKERESULT(Module_Libnx, LibnxError_OutOfMemory);
 
-    Result rc = _usbDsGetSession(&interface->h, &ptr->h, 0, descriptor, USB_DT_ENDPOINT_SIZE, NULL, 0);
+    Result rc = _usbDsGetSession(&interface->h, &ptr->h, 0, descriptor, USB_DT_ENDPOINT_SIZE, NULL, 0, NULL);
 
     if (R_SUCCEEDED(rc)) rc = _usbDsGetEvent(&ptr->h, &ptr->CompletionEvent, 2);//GetCompletionEvent
 
@@ -1004,7 +1028,7 @@ Result usbDsInterface_RegisterEndpoint(UsbDsInterface* interface, UsbDsEndpoint*
         u32 ep_addr;
     } *raw;
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(&interface->h, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = 0;
@@ -1014,17 +1038,18 @@ Result usbDsInterface_RegisterEndpoint(UsbDsInterface* interface, UsbDsEndpoint*
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
-        } *resp = r.Raw;
+        } *resp;
+
+        serviceIpcParse(&interface->h, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
 
         if (R_SUCCEEDED(rc)) {
-            serviceCreate(&ptr->h, r.Handles[0]);
+            serviceCreateSubservice(&ptr->h, &interface->h, &r, 0);
         }
     }
     
@@ -1051,7 +1076,7 @@ Result usbDsInterface_AppendConfigurationData(UsbDsInterface* interface, UsbDevi
         u32 speed;
     } *raw;
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(&interface->h, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = 12;
@@ -1062,12 +1087,13 @@ Result usbDsInterface_AppendConfigurationData(UsbDsInterface* interface, UsbDevi
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
-        } *resp = r.Raw;
+        } *resp;
+
+        serviceIpcParse(&interface->h, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
     }
@@ -1123,7 +1149,7 @@ Result usbDsEndpoint_SetZlt(UsbDsEndpoint* endpoint, bool zlt)
         u32 zlt;
     } *raw;
 
-    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw = serviceIpcPrepareHeader(&endpoint->h, &c, sizeof(*raw));
 
     raw->magic = SFCI_MAGIC;
     raw->cmd_id = 5;
@@ -1133,12 +1159,13 @@ Result usbDsEndpoint_SetZlt(UsbDsEndpoint* endpoint, bool zlt)
 
     if (R_SUCCEEDED(rc)) {
         IpcParsedCommand r;
-        ipcParse(&r);
-
         struct {
             u64 magic;
             u64 result;
-        } *resp = r.Raw;
+        } *resp;
+
+        serviceIpcParse(&endpoint->h, &r, sizeof(*resp));
+        resp = r.Raw;
 
         rc = resp->result;
     }

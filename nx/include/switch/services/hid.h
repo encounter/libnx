@@ -8,6 +8,7 @@
 #pragma once
 #include <assert.h>
 #include "../types.h"
+#include "../kernel/event.h"
 #include "../services/sm.h"
 
 // Begin enums and output structs
@@ -671,6 +672,11 @@ Result hidSetSupportedNpadIdType(HidControllerID *buf, size_t count);
 /// Sets which controller types are supported. This is automatically called with all types in \ref hidInitialize.
 Result hidSetSupportedNpadStyleSet(HidControllerType type);
 
+/// Gets an event with the specified autoclear for the input controller.
+/// The user *must* close the event when finished with it / before the app exits.
+/// This is signaled when the \ref hidGetControllerType output is updated for the controller.
+Result hidAcquireNpadStyleSetUpdateEventHandle(HidControllerID id, Event* event, bool autoclear);
+
 /// Sets the hold-type, see \ref HidJoyHoldType.
 Result hidSetNpadJoyHoldType(HidJoyHoldType type);
 
@@ -686,6 +692,8 @@ Result hidSetNpadJoyAssignmentModeSingleByDefault(HidControllerID id);
 Result hidSetNpadJoyAssignmentModeDual(HidControllerID id);
 
 /// Merge two single joy-cons into a dual-mode controller. Use this after \ref hidSetNpadJoyAssignmentModeDual, when \ref hidSetNpadJoyAssignmentModeSingleByDefault was previously used (this includes using this manually at application exit).
+/// To be successful, id0/id1 must correspond to controller types TYPE_JOYCON_LEFT/TYPE_JOYCON_RIGHT, or TYPE_JOYCON_RIGHT/TYPE_JOYCON_LEFT.
+/// If successful, the id of the resulting dual controller is set to id0.
 Result hidMergeSingleJoyAsDualJoy(HidControllerID id0, HidControllerID id1);
 
 Result hidInitializeVibrationDevices(u32 *VibrationDeviceHandles, size_t total_handles, HidControllerID id, HidControllerType type);
